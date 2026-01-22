@@ -1,0 +1,45 @@
+{
+    "test_cases": [
+        {
+            "prompt": "What is machine learning?",
+            "max_tokens": 50,
+            "temperature": 0.7,
+            "category": "short"
+        },
+        {
+            "prompt": "Explain Python in one sentence.",
+            "max_tokens": 50,
+            "temperature": 0.7,
+            "category": "short"
+        },
+        {
+            "prompt": "Explain the difference between supervised and unsupervised learning in machine learning. Provide examples of each.",
+            "max_tokens": 200,
+            "temperature": 0.7,
+            "category": "medium"
+        },
+        {
+            "prompt": "Write a brief overview of how neural networks work, including the concepts of layers, weights, and activation functions.",
+            "max_tokens": 200,
+            "temperature": 0.7,
+            "category": "medium"
+        },
+        {
+            "prompt": "Provide a comprehensive explanation of how transformers work in natural language processing. Include details about attention mechanisms, positional encoding, and the encoder-decoder architecture. Give examples of popular transformer models.",
+            "max_tokens": 500,
+            "temperature": 0.7,
+            "category": "long"
+        },
+        {
+            "prompt": "Explain the complete machine learning pipeline from data collection to model deployment. Include data preprocessing, feature engineering, model selection, training, validation, and deployment considerations.",
+            "max_tokens": 500,
+            "temperature": 0.7,
+            "category": "long"
+        }
+    ],
+    "settings": {
+        "lm_studio_url": "http://172.31.98.87:1234/v1",
+        "output_directory": "./benchmark_results",
+        "delay_between_requests": 1.0
+    }
+}
