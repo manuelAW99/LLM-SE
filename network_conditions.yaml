@@ -1,0 +1,15 @@
+Normal
+Medium
+ - Lag: 120
+ - Drop: 5
+ - Throttle: 
+    - Timeframe: 30
+    - Chance: 5
+ - Bandwidth: 2048 
+Bad
+ - Lag: 300
+ - Drop: 20
+ - Throttle: 
+    - Timeframe: 40
+    - Chance: 10
+ - Bandwidth: 128 

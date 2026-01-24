@@ -1,0 +1,10 @@
+Reset
+tc qdisc del dev wlp2s0 root
+
+
+Check
+tc qdisc show dev eth0
+ping -c 10 8.8.8.8
+
+https://www.speedtest.net
+
