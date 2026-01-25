@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 
 # Open CSV file and load data into DataFrame
-data = pd.read_csv('.\\benchmark_results\\report_3.CSV', encoding='latin-1', decimal=',', thousands='.')
+data = pd.read_csv('.\\benchmark_results\\local.CSV', encoding='latin-1', decimal='.', thousands=',')
 # Remove leading/trailing whitespace and special characters (like BOM) from column names
 data.columns = data.columns.str.strip().str.replace('\ufeff', '', regex=False)
 
@@ -15,12 +15,18 @@ print(f"\nColumn names: {data.columns[:5].tolist()}")  # Print first 5 column na
 # Filter columns to keep only the relevant metrics
 columns_to_keep = [
     'Potenza totale CPU [W]',
+    "CPU Package Power [W]",
     'Potenza Core IA [W]',
+    "IA Cores Power [W]",
     'VR VCC Corrente (SVID IOUT) [A]',
+    "VR VCC Current (SVID IOUT) [A]"
     'GPU Potenza [W]',
+    "GPU Power [W]",
     'IGPU Potenza [W]',
+    "IGPU Power [W]"
     'Potenza DRAM totale [W]',
-    'Consumo energetico resto del chip [W]'
+    'Consumo energetico resto del chip [W]',
+    'Rest-of-Chip Power [W]'
 ]
 
 # Keep only columns that exist in the DataFrame
@@ -58,7 +64,7 @@ import json
 # Convert the first two time-related columns to datetime
 # Combine Date and Time columns to create a datetime column
 data_filtered['timestamp'] = pd.to_datetime(
-    data['ï»¿Date'] + ' ' + data['Time'],
+    data['Date'] + ' ' + data['Time'],
     format='%d.%m.%Y %H:%M:%S.%f',
     errors='coerce'
 )
@@ -66,7 +72,7 @@ data_filtered['timestamp'] = pd.to_datetime(
 print(f"\nCSV time range (corrected): {data_filtered['timestamp'].min()} to {data_filtered['timestamp'].max()}")
 
 # Load JSON benchmark data
-json_file = '.\\benchmark_results\\benchmark_20260121_120554.json'
+json_file = '.\\benchmark_results\\benchmark_openai_gpt-oss-20b_20260125_123635.json'
 with open(json_file, 'r', encoding='utf-8') as f:
     benchmark_data = json.load(f)
 
@@ -79,7 +85,7 @@ if 'results' in benchmark_data:
             'timestamp_response': pd.to_datetime(entry['timestamp_response']),
             'total_tokens': entry.get('total_tokens', 0),
             'elapsed_time': entry.get('elapsed_time_seconds', 0),
-            'category': entry.get('category', 'unknown')
+            'size_category': entry.get('size_category', 'unknown')
         })
 
 # Convert to DataFrame
@@ -88,6 +94,19 @@ request_df = pd.DataFrame(request_events)
 if len(request_df) > 0:
     print(f"\nJSON time range: {request_df['timestamp_send'].min()} to {request_df['timestamp_send'].max()}")
     print(f"Total requests: {len(request_df)}")
+    
+    # Get the first timestamp_send and last timestamp_response from JSON
+    first_json_timestamp = request_df['timestamp_send'].min()
+    last_json_timestamp = request_df['timestamp_response'].max()
+    print(f"\nFirst timestamp_send in JSON: {first_json_timestamp}")
+    print(f"Last timestamp_response in JSON: {last_json_timestamp}")
+    
+    # Filter CSV data to show only from first request send to last response
+    data_filtered = data_filtered[
+        (data_filtered['timestamp'] >= first_json_timestamp) & 
+        (data_filtered['timestamp'] <= last_json_timestamp)
+    ].copy()
+    print(f"CSV data filtered to {len(data_filtered)} rows (from first request to last response)")
     
     # For each request, find the closest CSV measurement
     request_df['csv_index'] = request_df['timestamp_send'].apply(
@@ -130,7 +149,7 @@ for column in existing_columns:
         added_to_legend = set()
         
         for idx, row in request_df.iterrows():
-            category = row['category']
+            category = row['size_category']
             color = category_colors.get(category, 'lightgray')
             label = f'{category.capitalize()} Request' if category not in added_to_legend else None
             
