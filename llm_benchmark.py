@@ -4,6 +4,8 @@ import time
 from datetime import datetime
 from typing import Dict, List, Optional
 import os
+import yaml
+from lm_studio_manager import LMStudioManager
 
 
 class LMStudioClient:
@@ -79,7 +81,7 @@ class LMStudioClient:
                 "status": "success"
             }
             
-            print(f"Request completed in {elapsed_time:.2f}s - Prompt: {len(prompt)} chars, Response: {len(response_text)} chars")
+            print(f"✅ {elapsed_time:.2f}s")
             return metrics
             
         except requests.exceptions.Timeout:
@@ -99,7 +101,7 @@ class LMStudioClient:
                 "model": self.model,
                 "status": "timeout"
             }
-            print(f"Request timeout after {time.time() - start_time:.2f}s")
+            print(f"⏱️ Timeout")
             return metrics
             
         except Exception as e:
@@ -119,18 +121,21 @@ class LMStudioClient:
                 "model": self.model,
                 "status": f"error: {str(e)}"
             }
-            print(f"Request error: {e}")
+            print(f"❌ Error")
             return metrics
 
 
 class BenchmarkDatabase:
     
-    def __init__(self, output_dir: str = "./benchmark_results"):
+    def __init__(self, output_dir: str = "./benchmark_results", filename: str = None):
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
         
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.json_file = os.path.join(output_dir, f"benchmark_{timestamp}.json")
+        if filename:
+            self.json_file = os.path.join(output_dir, filename)
+        else:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.json_file = os.path.join(output_dir, f"benchmark_{timestamp}.json")
         
         self.results: List[Dict] = []
         
@@ -199,61 +204,145 @@ def load_config(config_file: str = "prompts_config.json") -> Dict:
     return config
 
 
+def load_experiments_config(config_file: str = "experiments.yaml") -> Dict:
+    """Load the experiments configuration from YAML file."""
+    if not os.path.exists(config_file):
+        candidate = os.path.join(os.path.dirname(__file__), config_file)
+        if os.path.exists(candidate):
+            config_file = candidate
+        else:
+            raise FileNotFoundError(f"Configuration file not found: {config_file}")
+    
+    with open(config_file, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+    
+    return config
+
+
 def main():
     print("\n" + "="*60)
-    print("LLM STUDIO BENCHMARK TOOL")
+    print("LLM STUDIO BENCHMARK TOOL - EXPERIMENTS MODE")
     print("="*60 + "\n")
     
-    config = load_config()
+    # Load experiments configuration
+    experiments_config = load_experiments_config()
     
-    settings = config.get('settings', {})
+    # Load general settings from prompts_config.json
+    try:
+        prompts_config = load_config()
+        settings = prompts_config.get('settings', {})
+    except:
+        settings = {}
+    
     lm_studio_url = settings.get('lm_studio_url', 'http://localhost:1234/v1')
     output_dir = settings.get('output_directory', './benchmark_results')
     delay = settings.get('delay_between_requests', 1.0)
     
-    client = LMStudioClient(base_url=lm_studio_url)
-    db = BenchmarkDatabase(output_dir=output_dir)
+    # Extract experiment parameters
+    repetitions = experiments_config.get('repetitions', 5)
+    template = experiments_config.get('template')
+    models = experiments_config.get('models', [])
+    topics = experiments_config.get('topics', [])
+    sizes = experiments_config.get('sizes', [])
     
-    test_cases = config.get('test_cases', [])
+    # Convert sizes to dict format
+    sizes_dict = {}
+    for size_item in sizes:
+        for size_name, size_value in size_item.items():
+            sizes_dict[size_name] = size_value
     
-    if not test_cases:
-        print("No test cases found in configuration file.")
+    print(f"Experiment Configuration:")
+    print(f"  - Models: {len(models)}")
+    print(f"  - Topics: {len(topics)}")
+    print(f"  - Sizes: {list(sizes_dict.keys())}")
+    print(f"  - Repetitions per query: {repetitions}")
+    print(f"\nTotal queries per model: {len(topics) * len(sizes_dict) * repetitions}")
+    print(f"Total queries overall: {len(models) * len(topics) * len(sizes_dict) * repetitions}\n")
+    
+    # Initialize LM Studio Manager
+    base_url = lm_studio_url.replace('/v1', '')
+    manager = LMStudioManager(base_url=base_url)
+    
+    if not manager.check_server():
+        print("❌ Cannot connect to LM Studio server. Make sure it's running.")
         return
     
-    print(f"Loaded {len(test_cases)} test cases from configuration\n")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    print("Starting benchmark...")
-    print("-" * 60)
+    # Process each model
+    for model_idx, model_name in enumerate(models, 1):
+        print("\n" + "="*60)
+        print(f"MODEL {model_idx}/{len(models)}: {model_name}")
+        print("="*60)
+        
+        # Load the model
+        print(f"\n🔄 Loading model: {model_name}")
+        if not manager.load_model(model_name):
+            print(f"❌ Failed to load model {model_name}. Skipping...")
+            continue
+        
+        # Create database for this model
+        model_safe_name = model_name.replace('/', '_').replace(' ', '_')
+        filename = f"benchmark_{model_safe_name}_{timestamp}.json"
+        db = BenchmarkDatabase(output_dir=output_dir, filename=filename)
+        
+        # Create client with this model
+        client = LMStudioClient(base_url=lm_studio_url, model=model_name)
+        
+        total_queries = len(topics) * len(sizes_dict) * repetitions
+        query_count = 0
+        
+        print(f"\n🚀 Starting benchmark for {model_name}...")
+        print("-" * 60)
+        
+        # For each topic
+        for topic_idx, topic in enumerate(topics, 1):
+            print(f"\n📌 Topic {topic_idx}/{len(topics)}: {topic}")
+            
+            # For each size
+            for size_name, size_value in sizes_dict.items():
+                prompt = template.format(size=size_value, topic=topic)
+                
+                print(f"  📊 Size: {size_name} ({size_value} words)")
+                
+                # Repeat N times
+                for rep in range(1, repetitions + 1):
+                    query_count += 1
+                    print(f"    [{query_count}/{total_queries}] Rep {rep}/{repetitions}... ", end="")
+                    
+                    metrics = client.send_request(
+                        prompt=prompt,
+                        max_tokens=size_value * 2,  # Approximate: 2 tokens per word
+                        temperature=0.7
+                    )
+                    
+                    # Add experiment metadata
+                    metrics['topic'] = topic
+                    metrics['size_category'] = size_name
+                    metrics['size_words'] = size_value
+                    metrics['repetition'] = rep
+                    
+                    db.add_result(metrics)
+                    
+                    if query_count < total_queries:
+                        time.sleep(delay)
+        
+        print("\n" + "-" * 60)
+        print(f"✅ Completed benchmark for model: {model_name}")
+        
+        # Save results for this model
+        print(f"💾 Saving results to: {db.json_file}")
+        db.save_all()
+        db.print_summary()
+        
+        # Small delay before loading next model
+        if model_idx < len(models):
+            print("\n⏳ Waiting before loading next model...")
+            time.sleep(5)
     
-    for i, test_case in enumerate(test_cases, 1):
-        category = test_case.get('category', 'unknown')
-        prompt = test_case['prompt']
-        max_tokens = test_case.get('max_tokens', 100)
-        temperature = test_case.get('temperature', 0.7)
-        
-        print(f"\n[{i}/{len(test_cases)}] Category: {category}")
-        print(f"Prompt: {prompt[:80]}...")
-        
-        metrics = client.send_request(
-            prompt=prompt,
-            max_tokens=max_tokens,
-            temperature=temperature
-        )
-        
-        metrics['category'] = category
-        
-        db.add_result(metrics)
-        
-        if i < len(test_cases):
-            time.sleep(delay)
-    
-    print("\n" + "-" * 60)
-    print("Benchmark completed!")
-    
-    print("\nSaving results...")
-    db.save_all()
-    
-    db.print_summary()
+    print("\n" + "="*60)
+    print("🎉 ALL EXPERIMENTS COMPLETED!")
+    print("="*60)
 
 
 if __name__ == "__main__":

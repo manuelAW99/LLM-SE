@@ -1,0 +1,31 @@
+repetitions: 5
+
+template: "In {size} words, please give me information about {topic}."
+
+models:
+  - "liquid/lfm2.5-1.2b"
+  - "qwen/qwen3-4b-thinking-2507"
+  - "llama3.1-8b-chinese-chat"
+  - "openai/gpt-oss-20b"
+
+topics: 
+  - "United States"
+  - "Donald Trump"
+  - "Elizabeth II"
+  - "India"
+  - "Barack Obama"
+  - "Cristiano Ronaldo"
+  - "World War II"
+  - "United Kingdom"
+  - "Michael Jackson"
+  - "Elon Musk"
+
+sizes:
+  - short: 100
+  - medium: 500
+  - long: 1000
+
+network_conditions:
+  - Normal
+  - Medium
+  - Bad
