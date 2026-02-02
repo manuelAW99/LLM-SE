@@ -72,7 +72,7 @@ data_filtered['timestamp'] = pd.to_datetime(
 print(f"\nCSV time range (corrected): {data_filtered['timestamp'].min()} to {data_filtered['timestamp'].max()}")
 
 # Load JSON benchmark data
-json_file = '.\\benchmark_results\\benchmark_openai_gpt-oss-20b_20260125_123635.json'
+json_file = '.\\benchmark_results\\benchmark_qwen_qwen3-4b-thinking-2507_20260126_004413.json'
 with open(json_file, 'r', encoding='utf-8') as f:
     benchmark_data = json.load(f)
 

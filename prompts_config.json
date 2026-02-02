@@ -1,6 +1,6 @@
 {
     "settings": {
-        "lm_studio_url": "http://localhost:1234/v1",
+        "lm_studio_url": "http://192.168.159.104:1234/v1",
         "output_directory": "./benchmark_results",
         "delay_between_requests": 1.0
     }
